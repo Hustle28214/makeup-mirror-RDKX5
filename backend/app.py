@@ -19,14 +19,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import cv2
 
 from camera import Camera
-from detector import DandruffDetector
 from makeup_detector import MakeupDetector
 
 HOST = "0.0.0.0"
 PORT = 8080
 _DEFAULT_CAM = "0" if sys.platform.startswith("win") else "/dev/video0"
 CAM_DEVICE = os.environ.get("MM_CAM", _DEFAULT_CAM)
-MODE = os.environ.get("MM_MODE", "dandruff").lower()
+MODE = "makeup"
 # Capture size + FPS come from env so the RDK X5 systemd unit can trim them
 # down without editing code. Defaults are Windows-dev-friendly (1080p30);
 # the RDK unit sets CAM_W=1280 CAM_H=720 TARGET_FPS=15 to fit the 3 GB board.
@@ -42,12 +41,8 @@ JPEG_QUALITY = int(os.environ.get("MM_JPEG_QUALITY", "80"))
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend")
 
 _camera = Camera(device=CAM_DEVICE, width=CAM_W, height=CAM_H, fps=CAM_FPS)
-if MODE == "makeup":
-    _detector = MakeupDetector()
-    _INDEX_PAGE = "makeup.html"
-else:
-    _detector = DandruffDetector()
-    _INDEX_PAGE = "index.html"
+_detector = MakeupDetector()
+_INDEX_PAGE = "makeup.html"
 
 # Shared latest encoded frame + detection result.
 _state_lock = threading.Lock()
