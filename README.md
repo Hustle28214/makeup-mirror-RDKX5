@@ -1,62 +1,50 @@
-# make-up-mirror (RDK X5)
+# 小罗看见 · RDK X5 镜头妆效反馈镜
 
-基于 **地平线 RDK X5** 的智能化妆镜：USB 摄像头 → RDK X5 → HDMI 触控屏。云台跟随人脸，全屏实时预览，并叠加**化妆分析**或**头皮屑检测**结果。开机自启动，接上 HDMI 与摄像头即用。
+“小罗看见”是一个面向新手跟练化妆的双视角反馈原型：手机 App 播放教程，RDK X5 采集镜前摄像头画面并通过 HDMI 显示镜头视角，用户可以及时判断眼影、腮红等妆效是否被相机“吃掉”。
 
-## 功能
+本仓库只保留当前可复用的核心链路：RDK X5 硬件服务、HDMI Kiosk、可选云台跟脸，以及 iOS SwiftUI App。第三方模型代理、API Key、旧版实验后端、路演/PRD 素材和本机 Xcode 状态文件未纳入。
 
-- **化妆镜模式 (`MM_MODE=makeup`)**：分区匀度（额头 / 双颊 / 下巴）、左右对称度（LAB 色差）、痘痘/红斑候选、T 区油光、黑眼圈、光照左右均衡、滚动时间线与总体评分。
-- **头皮屑检测模式 (`MM_MODE=dandruff`，默认)**：针对黑色头发优化的 HSV + 白 top-hat 流水线，输出头皮屑数量与位置。
-- **人脸跟踪云台**：PCA9685 + 两颗连续旋转舵机（yaw + tilt），Haar 正脸 / 侧脸级联，画面偏差驱动速度控制 `pulse = stop + gain × err`，人脸居中即停。
-- **Kiosk 前端**：单页 HTML/CSS/JS + Chromium `--kiosk` 全屏，MJPEG 推流 + JSON 检测端点。
+## 当前状态
 
-## 硬件（详见 [BOM.csv](BOM.csv)）
+- 已验证：iOS App 可解析 RDK X5 的 MJPEG 连续 JPEG 帧并实时显示；可切换手机前置摄像头；可定格当前画面。
+- 已验证：语音暂停视频使用 Mac 辅助功能配置完成，但本仓库不把它包装成 RDK X5 已完成能力。
+- 已保留：RDK X5 的 USB 摄像头采集、化妆检测叠加、`/stream.mjpg` 推流、`/detections.json` 检测结果、HDMI Kiosk 和 PCA9685 云台跟脸代码。
+- 未声称：摄像头/显示屏的最终结构、实时传输延迟、模型 API 联调、自动妆容判断和硬件稳定性已完成。
 
-- 主控：RDK X5（Ubuntu ARM64）
-- 舵机：MG90S 数字舵机 × 2（连续旋转型，非位置型）
-- 舵机驱动：PCA9685（16 路 PWM，I²C）
-- 音频：WM8960（可选，麦克风 + 喇叭）
-- 摄像头：USB UVC 免驱，支持 1080p MJPG
-- 显示：HDMI 触控屏
-- 结构：折叠式化妆镜
-- 电源：12V DC 适配器 + DC 12V→5V 分电模块
+## 目录
 
-I²C 接线：PCA9685 挂在 **`/dev/i2c-5`**（40-pin 的 Pin 3/5），地址 `0x40`；yaw = CH0，tilt = CH1。
-
-## 目录结构
-
-```
-backend/          # HTTP + MJPEG 服务 (app.py)、Camera、DandruffDetector、MakeupDetector
-frontend/         # index.html (头皮屑) / makeup.html (化妆镜) + JS/CSS
-face_track/       # 独立的 PCA9685 云台跟脸脚本 face_track.py + 标定/自检工具
-scripts/          # 部署脚本 (install.sh / kiosk.sh / deploy_rdk.py / 各类 _rdk_*.py 诊断)
-systemd/          # makeup-mirror-backend.service + makeup-mirror-kiosk.service
-BOM.csv           # 硬件物料清单
+```text
+backend/                 RDK X5 摄像头、化妆检测和 HTTP 服务
+frontend/                HDMI Kiosk 页面
+face_track/              PCA9685 云台跟脸及标定工具
+systemd/                 RDK X5 后端和 Kiosk 服务单元
+scripts/install.sh       板端安装脚本
+scripts/kiosk.sh         Chromium/Firefox Kiosk 启动脚本
+scripts/deploy_rdk.py    局域网部署辅助脚本
+BOM.csv                  硬件物料清单
+ios/                     SwiftUI App 与 Xcode 工程
 ```
 
-## 部署到 RDK X5
+## RDK X5 运行
+
+硬件要求：RDK X5、USB UVC 摄像头、HDMI 显示器；云台跟脸另需 PCA9685 和舵机。默认摄像头为 `/dev/video0`，后端监听 `8080`。
 
 ```bash
-# 克隆或 scp 到板子，建议路径 /home/sunrise/make-up-mirror
-cd ~/make-up-mirror
+cd ~/makeup-mirror-RDKX5
 bash scripts/install.sh
-sudo reboot
+sudo systemctl start makeup-mirror-backend
+sudo systemctl start makeup-mirror-kiosk
 ```
 
-启动后 HDMI 应自动进入全屏检测界面。
+浏览器检查：
 
-## 手动运行（调试）
-
-**后端服务：**
-
-```bash
-cd ~/make-up-mirror/backend
-python3 app.py                               # 默认头皮屑模式 + /dev/video0
-MM_MODE=makeup python3 app.py                # 切换化妆镜模式
-MM_CAM=/dev/video2 python3 app.py            # 指定摄像头
-xdg-open http://127.0.0.1:8080/
+```text
+http://<RDK-X5-IP>:8080/
+http://<RDK-X5-IP>:8080/stream.mjpg
+http://<RDK-X5-IP>:8080/detections.json
 ```
 
-常用环境变量：`MM_MODE` (`dandruff`/`makeup`)、`MM_CAM`、`MM_CAM_W`/`MM_CAM_H`/`MM_CAM_FPS`、`MM_TARGET_FPS`、`MM_DETECT_EVERY`、`MM_JPEG_QUALITY`。RDK X5 上 systemd 单元默认降到 1280×720 15fps 以适配 3 GB 内存。
+常用调试变量：`MM_CAM`、`MM_CAM_W`、`MM_CAM_H`、`MM_CAM_FPS`、`MM_TARGET_FPS`、`MM_DETECT_EVERY`、`MM_JPEG_QUALITY`。化妆检测参数见 `backend/makeup_detector.py`。
 
 **云台跟脸：**
 
@@ -82,35 +70,22 @@ python3 servo_calibrate.py                   # 交互 jog/us/release 测舵机
 - **软件角度限位**（基于开环 θ 积分，超界自动钳到 stop）：`--yaw-limit-left-deg 90 --yaw-limit-right-deg 90 --tilt-limit-up-deg 90 --tilt-limit-down-deg 30`。
 - **速度模型系数**（2026-08-30 负载状态标定）：yaw `ω=1.86·Δus−62`（min |Δus|=60）；tilt `ω=1.76·Δus−64`（min |Δus|=90）。可用 `--yaw-speed-slope / --yaw-speed-intercept / --tilt-speed-slope / --tilt-speed-intercept` 覆盖。
 
-## HTTP 接口
+## iOS App
 
-- `GET /`                — 前端 (依 `MM_MODE` 返回 `index.html` 或 `makeup.html`)
-- `GET /stream.mjpg`     — 带叠加的 MJPEG 视频流
-- `GET /detections.json` — 最新一帧检测结果 JSON
+用 Xcode 打开 `ios/KanjianApp.xcodeproj`。运行前将 `ios/KanjianApp/KanjianViewModel.swift` 中的 `cameraServerURL` 改成 RDK X5 在当前局域网的地址，例如：
 
-## 排查
-
-```bash
-v4l2-ctl --list-devices                             # 找 USB 摄像头节点
-v4l2-ctl -d /dev/video0 --list-formats-ext          # 确认 1080p MJPG
-journalctl -u makeup-mirror-backend -f
-journalctl -u makeup-mirror-kiosk -f
-xrandr --output HDMI-1 --mode 1920x1080             # HDMI 分辨率修正
-i2cdetect -y -r 5                                   # 应看到 0x40 (PCA9685)
+```swift
+@Published var cameraServerURL = "http://192.168.1.20:8080"
 ```
 
-## 检测参数调优（头皮屑模式）
+手机和 RDK X5 必须在同一网络。App 的核心流程是：连接板端 MJPEG → 实时预览 → 定格 → 本地演示建议/效果图。模型 API 代理未随仓库上传；如需重新接入，应通过独立后端完成，并将密钥放在服务端环境变量，绝不写进 Swift 或 Git。
 
-阈值集中在 [backend/detector.py](backend/detector.py) 顶部：
+## 安全与提交边界
 
-- `HAIR_V_MAX` / `HAIR_S_MAX`：黑发范围，环境偏亮时上调 `HAIR_V_MAX`
-- `FLAKE_V_MIN` / `FLAKE_TOPHAT_MIN`：屑的亮度阈值
-- `MIN_AREA` / `MAX_AREA`：斑点面积（按 960 宽度内部处理）
-- `MIN_CIRCULARITY`：过滤长条状高光/发丝
+- 不提交 `.env`、API Key、Token、密码、运行时图片和 Xcode 用户状态。
+- RDK X5 的本地 HTTP 服务当前没有鉴权，不应直接暴露到公网。
+- 摄像头画面默认只用于实时显示和主动定格；是否保存、如何提示用户，仍需在产品验证中确定。
 
-## 后续可选升级
+## 说明
 
-- 用 RDK BPU 上的轻量语义分割（`hobot_dnn`）替换 CV 流水线，降低误检。
-- ROI：只在头发中央区域检测，规避额头/背景高光。
-- 双路摄像头（正/侧）：`app.py` 起两个 `Camera`，暴露 `/stream_a.mjpg`/`/stream_b.mjpg`，前端加切换按钮。
-- 化妆镜模式接入人脸关键点（MediaPipe / dlib），补齐几何对称度与口红/眼线越界检测。
+硬件基础代码来自 [Hustle28214/makeup-mirror-RDKX5](https://github.com/Hustle28214/makeup-mirror-RDKX5)。本次整理将其化妆镜主链路与本地 iOS App 合并，并删除与当前目标无关的头皮屑模式、Windows 运行脚本、诊断临时脚本、第三方模型代理和本机缓存。

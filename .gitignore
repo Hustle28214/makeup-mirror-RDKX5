@@ -1,0 +1,14 @@
+# Secrets and local runtime state
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+demo/data/hardware/*
+demo/data/reference/*
+__pycache__/
+*.pyc
+*.xcuserstate
+xcuserdata/
+**/xcuserdata/
+demo/
