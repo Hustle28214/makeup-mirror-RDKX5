@@ -1,9 +1,9 @@
 """Deploy make-up-mirror to an RDK X5 board over SSH (password auth).
 
 Usage:
-    python scripts/deploy_rdk.py [HOST] [USER] [PASSWORD]
+    RDK_PASSWORD='...' python scripts/deploy_rdk.py [HOST] [USER]
 
-Defaults: sunrise@192.168.127.10 / sunrise. Idempotent — safe to re-run.
+Defaults: sunrise@192.168.127.10. Set RDK_PASSWORD in the environment; no password is stored in source.
 
 Steps:
     1. probe the board (python3 / cv2 / video device / chromium)
@@ -25,7 +25,7 @@ import paramiko
 
 DEFAULT_HOST = "192.168.127.10"
 DEFAULT_USER = "sunrise"
-DEFAULT_PASS = "sunrise"
+DEFAULT_PASS = os.environ.get("RDK_PASSWORD", "")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REMOTE_ROOT_TMPL = "/home/{user}/make-up-mirror"
@@ -118,6 +118,8 @@ def main() -> int:
     host = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_HOST
     user = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_USER
     password = sys.argv[3] if len(sys.argv) > 3 else DEFAULT_PASS
+    if not password:
+        raise SystemExit("Set RDK_PASSWORD or pass the SSH password as the third argument.")
     remote_root = REMOTE_ROOT_TMPL.format(user=user)
 
     _print("ssh", f"connecting to {user}@{host} …")

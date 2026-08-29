@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <key>CFBundleIdentifier</key><string>com.kanjian.app</string>
+    <key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>1.0</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleDisplayName</key><string>外貌check</string>
+    <key>LSRequiresIPhoneOS</key><true/>
+    <key>UIRequiresFullScreen</key><true/>
+    <key>UISupportedInterfaceOrientations</key>
+    <array><string>UIInterfaceOrientationPortrait</string></array>
+    <key>UILaunchScreen</key><dict/>
+    <key>NSLocalNetworkUsageDescription</key><string>外貌check需要访问同一 Wi-Fi 下的开发板图片服务。</string>
+    <key>NSCameraUsageDescription</key><string>外貌check需要使用手机前置摄像头显示镜头妆效。</string>
+    <key>NSPhotoLibraryUsageDescription</key><string>外貌check需要从照片和视频中选择教程参考内容。</string>
+    <key>NSAppTransportSecurity</key><dict>
+        <key>NSAllowsLocalNetworking</key><true/>
+    </dict>
+</dict></plist>
