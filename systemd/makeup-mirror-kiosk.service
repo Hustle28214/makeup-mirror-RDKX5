@@ -1,7 +1,7 @@
 [Unit]
-Description=Make-up Mirror kiosk (Chromium fullscreen on HDMI)
-After=graphical.target makeup-mirror-backend.service
-Wants=makeup-mirror-backend.service
+Description=Make-up Mirror kiosk (Chromium fullscreen on HDMI, portrait)
+After=graphical.target face-track.service
+Wants=face-track.service
 
 [Service]
 Type=simple

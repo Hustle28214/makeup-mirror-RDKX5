@@ -1,0 +1,22 @@
+[Unit]
+Description=Face-tracking service (PCA9685 pan/tilt + camera + MJPEG debug UI)
+Documentation=file:///home/sunrise/face_track/face_track.py
+After=network.target
+# Only one thing at a time may own /dev/video0.
+Conflicts=makeup-mirror-backend.service
+
+[Service]
+Type=simple
+User=sunrise
+WorkingDirectory=/home/sunrise/face_track
+# Physical homing is a user action: park the mechanism to home pose BEFORE
+# this service (re)starts, otherwise theta=0 will not match physical zero.
+ExecStart=/usr/bin/python3 /home/sunrise/face_track/face_track.py --web-port 8080 --kiosk --yaw-limit-left-deg 60 --yaw-limit-right-deg 60
+Restart=on-failure
+RestartSec=2
+# If the kernel does have to OOM-kill something, take Firefox out first —
+# the kiosk unit will bring it back. Losing this service loses the app.
+OOMScoreAdjust=-500
+
+[Install]
+WantedBy=multi-user.target

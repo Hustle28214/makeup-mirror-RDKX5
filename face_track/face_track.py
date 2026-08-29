@@ -62,7 +62,7 @@ def build_argparser():
     p.add_argument("--stop-us", type=int, default=1560)
     p.add_argument("--yaw-stop-us", type=int, default=None)
     p.add_argument("--tilt-stop-us", type=int, default=None)
-    p.add_argument("--max-speed-us", type=int, default=200)
+    p.add_argument("--max-speed-us", type=int, default=120)
     p.add_argument("--yaw-gain", type=float, default=0.5)
     p.add_argument("--tilt-gain", type=float, default=0.45)
     p.add_argument("--yaw-invert", action=argparse.BooleanOptionalAction, default=True)
@@ -81,6 +81,16 @@ def build_argparser():
     p.add_argument("--yaw-limit-right-deg", type=float, default=90.0)
     p.add_argument("--tilt-limit-up-deg", type=float, default=90.0)
     p.add_argument("--tilt-limit-down-deg", type=float, default=30.0)
+    # Safety knobs — the open-loop speed model tends to under-integrate the
+    # true angle (real servo carries momentum past pulse=stop, and load
+    # sometimes pushes ω higher than calibrated). Scale amplifies the
+    # integrated theta so the limit triggers earlier; the soft-brake band
+    # tapers Δus toward zero as theta approaches the bound.
+    p.add_argument("--theta-scale", type=float, default=3.0)
+    p.add_argument("--brake-band-deg", type=float, default=45.0)
+    p.add_argument("--du-slew-us", type=int, default=35,
+                   help="Max change in signed Δus per frame. Rate-limits "
+                        "acceleration -> smoother motion, no abrupt jumps.")
 
     p.add_argument("--lost-frames", type=int, default=6)
     p.add_argument("--startup-park", type=float, default=0.4)
@@ -94,23 +104,27 @@ def build_argparser():
     p.add_argument("--det-scale", type=float, default=0.5,
                    help="Downscale factor applied to the frame before Haar "
                         "detection. 0.5 = ~4x faster. Preview stays full-res.")
-    p.add_argument("--min-neighbors", type=int, default=6,
+    p.add_argument("--min-neighbors", type=int, default=5,
                    help="Haar cascade minNeighbors. Higher = fewer false "
                         "positives from bright textureless regions. 4 permissive, "
-                        "6 default, 8 strict.")
+                        "5 default, 8 strict.")
     p.add_argument("--skin-check", action=argparse.BooleanOptionalAction,
                    default=True,
                    help="Reject candidates whose median YCrCb chroma is not in "
                         "human skin range. Filters out overexposed white walls.")
-    p.add_argument("--skin-cr-min", type=int, default=133)
-    p.add_argument("--skin-cr-max", type=int, default=173)
-    p.add_argument("--skin-cb-min", type=int, default=77)
-    p.add_argument("--skin-cb-max", type=int, default=127)
+    p.add_argument("--skin-cr-min", type=int, default=128)
+    p.add_argument("--skin-cr-max", type=int, default=180)
+    p.add_argument("--skin-cb-min", type=int, default=75)
+    p.add_argument("--skin-cb-max", type=int, default=135)
 
     p.add_argument("--show", action="store_true",
                    help="Local OpenCV preview window (needs DISPLAY)")
     p.add_argument("--web-port", type=int, default=None,
                    help="Serve MJPEG debug UI on this port (e.g. 8080)")
+    p.add_argument("--kiosk", action="store_true",
+                   help="Kiosk display: MJPEG page shows only the video with "
+                        "a center crosshair. No HUD text, no info panel, no "
+                        "face bbox / error line. For full-screen portrait use.")
     p.add_argument("--no-servo", action="store_true",
                    help="Skip PCA9685, detect only")
     return p
@@ -144,14 +158,30 @@ def omega_deg_s(delta_us, slope, intercept, min_us):
     return slope * delta_us + intercept
 
 
-def apply_angle_limit(pulse_us, stop_us, theta, theta_min, theta_max):
+def apply_angle_limit(pulse_us, stop_us, theta, theta_min, theta_max,
+                       brake_band_deg=0.0):
     """If theta already outside a bound, clamp pulse toward stop for that
-    direction (positive delta pushes theta up; if theta>=max, kill +delta)."""
+    direction (positive delta pushes theta up; if theta>=max, kill +delta).
+    Within brake_band_deg of a bound, taper the outbound delta linearly.
+    """
     delta = pulse_us - stop_us
     if theta >= theta_max and delta > 0:
         return stop_us, True
     if theta <= theta_min and delta < 0:
         return stop_us, True
+    if brake_band_deg > 0:
+        if delta > 0:
+            room = theta_max - theta
+            if room < brake_band_deg:
+                scale = max(0.0, room / brake_band_deg)
+                pulse_us = int(round(stop_us + delta * scale))
+                return pulse_us, scale < 1.0
+        elif delta < 0:
+            room = theta - theta_min
+            if room < brake_band_deg:
+                scale = max(0.0, room / brake_band_deg)
+                pulse_us = int(round(stop_us + delta * scale))
+                return pulse_us, scale < 1.0
     return pulse_us, False
 
 
@@ -190,8 +220,21 @@ setInterval(()=>fetch('/info').then(r=>r.text()).then(t=>{document.getElementByI
 </body></html>
 """
 
+# Bare kiosk page: just the MJPEG stream centered, no chrome, no text.
+KIOSK_HTML = b"""<!doctype html>
+<html><head><meta charset="utf-8"><title>face-track</title>
+<style>
+  html,body{margin:0;padding:0;background:#000;overflow:hidden;height:100vh;width:100vw}
+  body{display:flex;align-items:center;justify-content:center;cursor:none}
+  img{width:100vw;height:100vh;object-fit:contain;display:block}
+</style></head><body>
+<img src="/stream">
+</body></html>
+"""
 
-def _start_web_server(port):
+
+def _start_web_server(port, kiosk=False):
+    page = KIOSK_HTML if kiosk else INDEX_HTML
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
     class Handler(BaseHTTPRequestHandler):
@@ -202,9 +245,9 @@ def _start_web_server(port):
             if self.path in ("/", "/index.html"):
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
-                self.send_header("Content-Length", str(len(INDEX_HTML)))
+                self.send_header("Content-Length", str(len(page)))
                 self.end_headers()
-                self.wfile.write(INDEX_HTML)
+                self.wfile.write(page)
                 return
             if self.path == "/info":
                 _, info = _get_state()
@@ -310,7 +353,7 @@ def main():
 
     server = None
     if args.web_port:
-        server = _start_web_server(args.web_port)
+        server = _start_web_server(args.web_port, kiosk=args.kiosk)
         print(f"[web] http://<board-ip>:{args.web_port}/")
 
     stop = [False]
@@ -348,6 +391,9 @@ def main():
     prev_pulse_t = time.time()
     prev_yaw_us_active = yaw_stop
     prev_tilt_us_active = tilt_stop
+    # Slew-limited signed Δus. Written after every servo decision.
+    prev_yaw_du = 0
+    prev_tilt_du = 0
     # Background thread schedules the "park to stop" after a burst so the
     # main capture/detect loop is not blocked by the sleep. Only used in
     # burst mode; harmless if never armed.
@@ -486,22 +532,47 @@ def main():
                                         args.tilt_min_speed_us, args.max_speed_us)
 
                 yaw_us, yaw_limited = apply_angle_limit(
-                    yaw_us, yaw_stop, theta_yaw, theta_yaw_min, theta_yaw_max)
+                    yaw_us, yaw_stop, theta_yaw, theta_yaw_min, theta_yaw_max,
+                    args.brake_band_deg)
                 tilt_us, tilt_limited = apply_angle_limit(
-                    tilt_us, tilt_stop, theta_tilt, theta_tilt_min, theta_tilt_max)
+                    tilt_us, tilt_stop, theta_tilt, theta_tilt_min, theta_tilt_max,
+                    args.brake_band_deg)
+
+                # Slew-limit Δus per frame to bound acceleration -> smoother
+                # motion, no visible "急停" jerks. Applied AFTER limits so
+                # brake band + slew combine into a gentle deceleration.
+                if args.du_slew_us > 0:
+                    target_yaw_du = yaw_us - yaw_stop
+                    max_step = args.du_slew_us
+                    target_yaw_du = clamp(target_yaw_du,
+                                           prev_yaw_du - max_step,
+                                           prev_yaw_du + max_step)
+                    yaw_us = yaw_stop + target_yaw_du
+                    target_tilt_du = tilt_us - tilt_stop
+                    target_tilt_du = clamp(target_tilt_du,
+                                            prev_tilt_du - max_step,
+                                            prev_tilt_du + max_step)
+                    tilt_us = tilt_stop + target_tilt_du
+                    prev_yaw_du = target_yaw_du
+                    prev_tilt_du = target_tilt_du
+                else:
+                    prev_yaw_du = yaw_us - yaw_stop
+                    prev_tilt_du = tilt_us - tilt_stop
 
                 # Integrate theta from the pulse that was active over the
                 # interval since the last update, THEN apply the new pulse.
+                # theta_scale amplifies the estimate to compensate for servo
+                # momentum + model under-prediction.
                 now_t = time.time()
                 dt_active = now_t - prev_pulse_t
                 theta_yaw += omega_deg_s(
                     prev_yaw_us_active - yaw_stop, args.yaw_speed_slope,
                     args.yaw_speed_intercept, args.yaw_min_speed_us
-                ) * dt_active
+                ) * dt_active * args.theta_scale
                 theta_tilt += omega_deg_s(
                     prev_tilt_us_active - tilt_stop, args.tilt_speed_slope,
                     args.tilt_speed_intercept, args.tilt_min_speed_us
-                ) * dt_active
+                ) * dt_active * args.theta_scale
 
                 # Continuous drive (recommended): pulse rides until next update.
                 # Burst drive (legacy, low fps): background parker sends stop
@@ -522,10 +593,11 @@ def main():
                 prev_yaw_us_active = yaw_us
                 prev_tilt_us_active = tilt_us
 
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                cv2.drawMarker(frame, (fx, fy), (0, 255, 0),
-                               cv2.MARKER_CROSS, 20, 2)
-                cv2.line(frame, (cx_img, cy_img), (fx, fy), (0, 200, 0), 1)
+                if not args.kiosk:
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    cv2.drawMarker(frame, (fx, fy), (0, 255, 0),
+                                   cv2.MARKER_CROSS, 20, 2)
+                    cv2.line(frame, (cx_img, cy_img), (fx, fy), (0, 200, 0), 1)
             else:
                 lost += 1
                 yaw_us = yaw_stop
@@ -536,6 +608,8 @@ def main():
                     prev_yaw_us_active = yaw_stop
                     prev_tilt_us_active = tilt_stop
                     prev_pulse_t = time.time()
+                    prev_yaw_du = 0
+                    prev_tilt_du = 0
 
             cv2.drawMarker(frame, (cx_img, cy_img), (0, 0, 255),
                            cv2.MARKER_CROSS, 20, 2)
@@ -547,9 +621,10 @@ def main():
                    f"err=({err_x:+d},{err_y:+d})px  "
                    f"faces={len(faces)}[{det_kind}]  {lim_str}lost={lost}  "
                    f"fps={running_fps:.1f}")
-            cv2.rectangle(frame, (0, 0), (args.width, 28), (0, 0, 0), -1)
-            cv2.putText(frame, hud, (8, 20), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5, (0, 255, 255), 1, cv2.LINE_AA)
+            if not args.kiosk:
+                cv2.rectangle(frame, (0, 0), (args.width, 28), (0, 0, 0), -1)
+                cv2.putText(frame, hud, (8, 20), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5, (0, 255, 255), 1, cv2.LINE_AA)
 
             if args.show:
                 cv2.imshow("face-track", frame)

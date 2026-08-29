@@ -8,6 +8,17 @@ URL="http://127.0.0.1:8080/"
 # Best-effort: kill any prior chromium session on this display.
 pkill -f "chromium.*--kiosk" 2>/dev/null || true
 
+# Rotate HDMI display to portrait. The physical screen is mounted rotated
+# so the OS still sees HDMI-1 landscape and the WM must transform it.
+# Override rotation via KIOSK_ROTATE env (normal|left|right|inverted).
+ROTATE="${KIOSK_ROTATE:-right}"
+OUTPUT="$(xrandr --query 2>/dev/null | awk '/ connected/ {print $1; exit}')"
+if [ -n "$OUTPUT" ]; then
+  # --auto picks the preferred mode; without setting a mode first, rotate is
+  # a silent no-op on some drivers (screen sits at a stub 320x200 vsize).
+  xrandr --output "$OUTPUT" --auto --rotate "$ROTATE" 2>/dev/null || true
+fi
+
 # Kill screensaver / DPMS blanking.
 xset s off        2>/dev/null || true
 xset -dpms        2>/dev/null || true
