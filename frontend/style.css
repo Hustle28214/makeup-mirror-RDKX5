@@ -1,0 +1,60 @@
+:root {
+  --bg: #05070c;
+  --panel: rgba(12, 16, 26, 0.72);
+  --accent: #ffd23f;
+  --accent-warn: #ff4d5e;
+  --ok: #35e08a;
+  --text: #f4f6fb;
+  --muted: #8a93a6;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; cursor: none; }
+
+.stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  image-rendering: high-quality;
+}
+
+.hud {
+  position: absolute;
+  top: 3vh;
+  right: 3vh;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5vh;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.tile {
+  background: var(--panel);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 2.2vh 2.6vh;
+  min-width: 22vh;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+.tile.small { min-width: 16vh; padding: 1.6vh 2vh; }
+
+.tile-label { color: var(--muted); font-size: 1.7vh; letter-spacing: 0.15em; text-transform: uppercase; }
+.tile-value { color: var(--text); font-size: 6.5vh; font-weight: 700; line-height: 1.1; margin-top: 0.6vh; font-variant-numeric: tabular-nums; }
+.tile.small .tile-value { font-size: 4vh; }
+.tile-sub { color: var(--muted); font-size: 1.6vh; margin-top: 0.3vh; }
+
+.tile[data-state="ok"] .tile-value { color: var(--ok); }
+.tile[data-state="warn"] .tile-value { color: var(--accent); }
+.tile[data-state="alert"] .tile-value { color: var(--accent-warn); }

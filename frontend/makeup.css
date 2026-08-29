@@ -1,0 +1,63 @@
+/* Makeup mirror unified HUD styles */
+
+.makeup-hud {
+  top: 2vh;
+  right: 2vh;
+  bottom: 2vh;
+  max-width: 34vh;
+  gap: 1vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+  align-items: stretch;
+}
+.makeup-hud::-webkit-scrollbar { display: none; }
+
+.makeup-hud .tile {
+  padding: 1.6vh 2vh;
+  min-width: 30vh;
+  width: 30vh;
+}
+.makeup-hud .tile.small { padding: 1.2vh 1.8vh; }
+.makeup-hud .tile-value { font-size: 5.2vh; margin-top: 0.4vh; }
+.makeup-hud .tile.small .tile-value { font-size: 3.4vh; }
+.makeup-hud .tile-label { font-size: 1.5vh; }
+.makeup-hud .tile-sub { font-size: 1.4vh; }
+
+/* Per-region rows in the 4-region evenness tile */
+.region-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 0.35vh 0;
+  font-size: 1.9vh;
+}
+.region-row .name  { color: var(--muted); letter-spacing: 0.08em; }
+.region-row .score { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text); }
+.region-row[data-state="ok"]      .score { color: var(--ok); }
+.region-row[data-state="warn"]    .score { color: var(--accent); }
+.region-row[data-state="alert"]   .score { color: var(--accent-warn); }
+.region-row[data-state="unknown"] .score { color: var(--muted); }
+
+/* Timeline */
+.timeline-row {
+  display: flex;
+  align-items: center;
+  gap: 1.4vh;
+  margin-top: 0.6vh;
+}
+.timeline-num { flex: 0 0 auto; }
+#spark {
+  flex: 1 1 auto;
+  height: 6vh;
+  width: 100%;
+  min-width: 0;
+}
+#spark path.line   { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+#spark path.base   { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+#tile-timeline[data-state="warn"]  #spark path.line { stroke: var(--accent); }
+#tile-timeline[data-state="alert"] #spark path.line { stroke: var(--accent-warn); }
+#tile-timeline[data-state="ok"]    #spark path.line { stroke: var(--ok); }
+
+/* Verdict coloring on tile values */
+.tile[data-state="ok"]      .tile-value { color: var(--ok); }
+.tile[data-state="warn"]    .tile-value { color: var(--accent); }
+.tile[data-state="alert"]   .tile-value { color: var(--accent-warn); }
+.tile[data-state="unknown"] .tile-value { color: var(--muted); }

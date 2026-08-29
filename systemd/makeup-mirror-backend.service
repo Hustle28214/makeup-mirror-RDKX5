@@ -1,0 +1,28 @@
+[Unit]
+Description=Make-up Mirror backend (camera + dandruff detection)
+After=network.target
+
+[Service]
+Type=simple
+User=sunrise
+WorkingDirectory=/home/sunrise/make-up-mirror/backend
+Environment=MM_CAM=/dev/video0
+Environment=MM_MODE=makeup
+# Trim capture on the 3 GB RDK X5 board — 1080p30 saturates the CPU and
+# spikes Firefox's decode memory into the OOM zone. 720p15 is plenty for
+# a makeup mirror.
+Environment=MM_CAM_W=1280
+Environment=MM_CAM_H=720
+Environment=MM_CAM_FPS=15
+Environment=MM_TARGET_FPS=15
+Environment=MM_JPEG_QUALITY=75
+Environment=MM_DETECT_EVERY=3
+ExecStart=/usr/bin/python3 /home/sunrise/make-up-mirror/backend/app.py
+Restart=on-failure
+RestartSec=2
+# If the kernel does have to OOM-kill something, take Firefox out first —
+# the kiosk unit will bring it back. Losing the backend loses the app.
+OOMScoreAdjust=-500
+
+[Install]
+WantedBy=multi-user.target

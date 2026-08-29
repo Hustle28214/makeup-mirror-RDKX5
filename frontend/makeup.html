@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>妆容镜</title>
+<link rel="stylesheet" href="/style.css" />
+<link rel="stylesheet" href="/makeup.css" />
+</head>
+<body>
+  <div class="stage">
+    <img id="video" src="/stream.mjpg" alt="camera" />
+
+    <div class="hud makeup-hud">
+      <!-- 顶部大数字：综合评分 -->
+      <div class="tile" id="tile-overall">
+        <div class="tile-label">妆容综合评分</div>
+        <div class="tile-value" id="overall">--</div>
+        <div class="tile-sub" id="status">初始化…</div>
+      </div>
+
+      <!-- 分区不匀度 -->
+      <div class="tile small" id="tile-regions">
+        <div class="tile-label">分区不匀</div>
+        <div class="region-row" data-region="forehead"><span class="name">额头</span><span class="score">--</span></div>
+        <div class="region-row" data-region="l_cheek"><span class="name">左脸</span><span class="score">--</span></div>
+        <div class="region-row" data-region="r_cheek"><span class="name">右脸</span><span class="score">--</span></div>
+        <div class="region-row" data-region="chin"><span class="name">下巴</span><span class="score">--</span></div>
+      </div>
+
+      <!-- 左右对称 -->
+      <div class="tile small" id="tile-sym">
+        <div class="tile-label">左右对称</div>
+        <div class="tile-value" id="sym">--</div>
+        <div class="tile-sub" id="sym-detail">ΔL / Δa</div>
+      </div>
+
+      <!-- 痘痘/瑕疵 -->
+      <div class="tile small" id="tile-blemish">
+        <div class="tile-label">瑕疵计数</div>
+        <div class="tile-value" id="blemish">--</div>
+        <div class="tile-sub">红点 / 痘</div>
+      </div>
+
+      <!-- T 区油光 -->
+      <div class="tile small" id="tile-tzone">
+        <div class="tile-label">T 区油光</div>
+        <div class="tile-value" id="tzone">--</div>
+        <div class="tile-sub">高光像素占比</div>
+      </div>
+
+      <!-- 黑眼圈 -->
+      <div class="tile small" id="tile-dark">
+        <div class="tile-label">黑眼圈</div>
+        <div class="tile-value" id="dark">--</div>
+        <div class="tile-sub" id="dark-detail">L / R</div>
+      </div>
+
+      <!-- 光照/姿态 -->
+      <div class="tile small" id="tile-light">
+        <div class="tile-label">光照 / 姿态</div>
+        <div class="tile-value" id="light">--</div>
+        <div class="tile-sub" id="light-detail">--</div>
+      </div>
+
+      <!-- 时间轴（脱妆漂移） -->
+      <div class="tile" id="tile-timeline">
+        <div class="tile-label">脱妆时间轴</div>
+        <div class="timeline-row">
+          <div class="timeline-num">
+            <div class="tile-value" id="drift">--</div>
+            <div class="tile-sub">相对开始 (drift)</div>
+          </div>
+          <svg id="spark" viewBox="0 0 200 60" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/makeup.js"></script>
+</body>
+</html>

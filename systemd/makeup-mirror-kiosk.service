@@ -1,0 +1,17 @@
+[Unit]
+Description=Make-up Mirror kiosk (Chromium fullscreen on HDMI)
+After=graphical.target makeup-mirror-backend.service
+Wants=makeup-mirror-backend.service
+
+[Service]
+Type=simple
+User=sunrise
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/sunrise/.Xauthority
+ExecStartPre=/bin/sh -c 'until curl -sf http://127.0.0.1:8080/ > /dev/null; do sleep 1; done'
+ExecStart=/home/sunrise/make-up-mirror/scripts/kiosk.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical.target

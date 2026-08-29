@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>头皮屑检测镜</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="stage">
+    <img id="video" src="/stream.mjpg" alt="camera" />
+    <div class="hud">
+      <div class="tile">
+        <div class="tile-label">检测到头皮屑</div>
+        <div class="tile-value" id="count">--</div>
+        <div class="tile-sub" id="status">初始化…</div>
+      </div>
+      <div class="tile small">
+        <div class="tile-label">头发覆盖率</div>
+        <div class="tile-value" id="hair">--</div>
+      </div>
+      <div class="tile small">
+        <div class="tile-label">刷新</div>
+        <div class="tile-value" id="fps">--</div>
+        <div class="tile-sub">Hz</div>
+      </div>
+    </div>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
