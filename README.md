@@ -92,6 +92,6 @@ python3 servo_calibrate.py                   # 交互 jog/us/release 测舵机
 
 ## 项目海报
 
-![外貌 check 项目海报](assets/poster/waimao-check-poster.png)
+![外貌 check 项目海报](platform/uploads/2026/08/waimao-check-poster.jpg)
 
-原图路径：[assets/poster/waimao-check-poster.png](assets/poster/waimao-check-poster.png)
+图片路径：[platform/uploads/2026/08/waimao-check-poster.jpg](platform/uploads/2026/08/waimao-check-poster.jpg)
