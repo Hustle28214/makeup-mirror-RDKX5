@@ -1,84 +1,93 @@
-"""Interactive servo angle tool for calibration.
+"""Interactive servo tool for continuous-rotation calibration / test.
 
-Type commands like:
-  0 90        # ch0 to 90 deg
-  1 45        # ch1 to 45 deg
-  b 90 90     # both channels
-  step 0 5    # nudge ch0 by +5 deg from current
-  step 1 -10  # nudge ch1 by -10 deg
-  us 0 1500   # raw pulse width on ch0 (bypass angle mapping)
-  release     # de-energize both
-  q           # quit
+Continuous-rotation control (calibrated 2026-08-30, loaded):
+  stop_us = 1560
+  yaw:  omega_deg_s ~= 1.86 * (pulse-1560) - 62,  min |Δus|=60 to move
+  tilt: omega_deg_s ~= 1.76 * (pulse-1560) - 64,  min |Δus|=90 to move
+  pulse > 1560 -> CCW-as-viewed (yaw pans LEFT, tilt looks DOWN)
+
+Note: face_track.py auto-zeros theta at startup — this tool no longer
+needs a `zero` command. Physical homing is a user action (park mechanism
+at desired origin BEFORE launching face_track.py).
+
+Commands:
+  us <ch> <us>          # raw pulse width on ch (holds until you change it)
+  stop <ch>             # set ch to stop_us (1560)
+  stop                  # stop both
+  jog <ch> <dus> <ms>   # drive ch with pulse=1560+dus for <ms>, then stop
+                        #   e.g. `jog 0 60 400` = ch0 CCW (Δus=+60) 400ms
+                        #        `jog 1 -80 300` = ch1 CW  (Δus=-80) 300ms
+  release               # cut PWM (servo goes limp; can turn by hand)
+  q                     # quit (auto-stops both first)
 """
-import sys
 import time
-from pca9685 import PCA9685, Servo
+
+from pca9685 import PCA9685
 
 BUS = 5
 ADDR = 0x40
-MIN_US = 1000   # MG90S safe range
-MAX_US = 2000
+STOP_US = 1560
+
+
+def _jog(pca, ch, dus, ms):
+    pulse = STOP_US + int(dus)
+    pca.set_pulse_us(ch, pulse)
+    time.sleep(max(0, ms) / 1000.0)
+    pca.set_pulse_us(ch, STOP_US)
 
 
 def main():
     pca = PCA9685(bus=BUS, address=ADDR, freq_hz=50)
-    servos = {
-        0: Servo(pca, 0, min_us=MIN_US, max_us=MAX_US),
-        1: Servo(pca, 1, min_us=MIN_US, max_us=MAX_US),
-    }
+    pca.set_pulse_us(0, STOP_US)
+    pca.set_pulse_us(1, STOP_US)
     print(f"[init] PCA9685 on /dev/i2c-{BUS} @ 0x{ADDR:02x}, 50 Hz")
-    print("[init] centering both to 90 deg")
-    servos[0].set_angle(90); servos[1].set_angle(90)
-    time.sleep(0.3)
-    print("commands: '<ch> <deg>' | 'b <yaw> <tilt>' | 'step <ch> <d>' | "
-          "'us <ch> <us>' | 'release' | 'q'")
+    print(f"[init] both channels parked at stop_us={STOP_US}")
+    print("commands: 'us <ch> <us>' | 'stop [ch]' | 'jog <ch> <dus> <ms>' "
+          "| 'release' | 'q'")
 
     try:
         while True:
             try:
-                line = input("angle> ").strip()
+                line = input("srv> ").strip()
             except EOFError:
                 break
             if not line:
                 continue
             parts = line.split()
             cmd = parts[0].lower()
-
             try:
                 if cmd == "q":
                     break
                 elif cmd == "release":
-                    for s in servos.values():
-                        s.release()
-                    print("  released")
-                elif cmd == "b" and len(parts) == 3:
-                    a0, a1 = float(parts[1]), float(parts[2])
-                    servos[0].set_angle(a0); servos[1].set_angle(a1)
-                    print(f"  ch0={a0} ch1={a1}")
-                elif cmd == "step" and len(parts) == 3:
-                    ch = int(parts[1]); d = float(parts[2])
-                    cur = servos[ch].angle if servos[ch].angle is not None else 90
-                    new = cur + d
-                    servos[ch].set_angle(new)
-                    print(f"  ch{ch}: {cur} -> {servos[ch].angle}")
+                    pca.release(0); pca.release(1)
+                    print("  released both")
+                elif cmd == "stop":
+                    if len(parts) == 1:
+                        pca.set_pulse_us(0, STOP_US); pca.set_pulse_us(1, STOP_US)
+                        print("  both -> stop")
+                    else:
+                        ch = int(parts[1])
+                        pca.set_pulse_us(ch, STOP_US)
+                        print(f"  ch{ch} -> stop")
                 elif cmd == "us" and len(parts) == 3:
                     ch = int(parts[1]); us = int(parts[2])
                     pca.set_pulse_us(ch, us)
                     print(f"  ch{ch} pulse={us}us")
-                elif len(parts) == 2:
-                    ch = int(parts[0]); deg = float(parts[1])
-                    servos[ch].set_angle(deg)
-                    print(f"  ch{ch}={servos[ch].angle}")
+                elif cmd == "jog" and len(parts) == 4:
+                    ch = int(parts[1]); dus = int(parts[2]); ms = int(parts[3])
+                    _jog(pca, ch, dus, ms)
+                    print(f"  ch{ch} jog Δus={dus:+d} for {ms}ms -> stop")
                 else:
-                    print("  ? unrecognized. try:  0 90  |  1 45  |  b 90 90  |"
-                          "  step 0 5  |  us 0 1500  |  release  |  q")
+                    print("  ? try: us 0 1620 | stop | jog 0 60 400 | "
+                          "release | q")
             except (ValueError, KeyError, IndexError) as e:
                 print(f"  err: {e}")
     finally:
-        for s in servos.values():
-            s.release()
+        pca.set_pulse_us(0, STOP_US); pca.set_pulse_us(1, STOP_US)
+        time.sleep(0.1)
+        pca.release(0); pca.release(1)
         pca.close()
-        print("[bye] released and closed")
+        print("[bye] stopped, released, closed")
 
 
 if __name__ == "__main__":

@@ -60,14 +60,27 @@ xdg-open http://127.0.0.1:8080/
 
 **云台跟脸：**
 
+启动前必须**手动完成物理归零**（软件启动时会把两轴 θ 自动置零，作为后续限位/积分的原点）：
+
+1. **摄像头镜头朝向**：将镜头**摆到与自己视线平行**（正对预期使用者）。
+2. **舵机 1 (yaw, CH0)**：让摇臂**垂直于镜子边**，即云台正朝前。
+3. **舵机 2 (tilt, CH1)**：让镜头光轴**与视线平行**（水平方向对齐使用者眼睛高度）。
+
+到位后即可启动 —— 期间**不要再手动扭动机构**，否则内部 θ 与实际不符，限位会失灵。
+
 ```bash
 cd ~/make-up-mirror/face_track
 python3 face_track.py --web-port 8081        # 摄像头 0 + 舵机 + MJPEG 调试页
 python3 face_track.py --no-servo --show      # 仅检测，本地窗口预览
-python3 servo_calibrate.py                   # 找连续旋转舵机的 stop_us
+python3 servo_calibrate.py                   # 交互 jog/us/release 测舵机
 ```
 
-关键参数（详见 `face_track.py` 顶部）：`--stop-us`（连续旋转停机脉宽，默认 1575µs）、`--yaw-gain`/`--tilt-gain`、`--deadband-px`、`--max-speed-us`、`--yaw-invert`/`--tilt-invert`。
+关键参数（详见 `face_track.py` 顶部）：
+
+- **速度控制**：`--stop-us 1560`（连续旋转停机脉宽）、`--yaw-gain 0.9` / `--tilt-gain 0.7`、`--yaw-deadband-px 70` / `--tilt-deadband-px 130`、`--yaw-min-speed-us 60` / `--tilt-min-speed-us 90`、`--max-speed-us 200`。
+- **方向翻转**：`--yaw-invert` / `--no-yaw-invert`、`--tilt-invert` / `--no-tilt-invert`。
+- **软件角度限位**（基于开环 θ 积分，超界自动钳到 stop）：`--yaw-limit-left-deg 90 --yaw-limit-right-deg 90 --tilt-limit-up-deg 90 --tilt-limit-down-deg 30`。
+- **速度模型系数**（2026-08-30 负载状态标定）：yaw `ω=1.86·Δus−62`（min |Δus|=60）；tilt `ω=1.76·Δus−64`（min |Δus|=90）。可用 `--yaw-speed-slope / --yaw-speed-intercept / --tilt-speed-slope / --tilt-speed-intercept` 覆盖。
 
 ## HTTP 接口
 
