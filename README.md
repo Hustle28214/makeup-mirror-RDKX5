@@ -89,3 +89,9 @@ python3 servo_calibrate.py                   # 交互 jog/us/release 测舵机
 ## 说明
 
 硬件基础代码来自 [Hustle28214/makeup-mirror-RDKX5](https://github.com/Hustle28214/makeup-mirror-RDKX5)。本次整理将其化妆镜主链路与本地 iOS App 合并，并删除与当前目标无关的头皮屑模式、Windows 运行脚本、诊断临时脚本、第三方模型代理和本机缓存。
+
+## 项目海报
+
+![外貌 check 项目海报](platform/uploads/2026/08/waimao-check-poster.jpg)
+
+图片路径：[platform/uploads/2026/08/waimao-check-poster.jpg](platform/uploads/2026/08/waimao-check-poster.jpg)
